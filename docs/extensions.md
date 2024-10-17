@@ -11,6 +11,7 @@ This is documentation for integrating and sending data from third-party services
   * [Keycloak - OpenID](#keycloak)
   * [Azure AD - OpenID](#azure-ad)
   * [Other SSO providers](#other)
+  * [Testing SSO](#sso-testing)
 * [KMS](#KMS)
 * [Native Actions](#native-actions)
 * [Webhooks](#webhooks)
@@ -32,14 +33,10 @@ From the start, Shuffle has been a platform about integrations. We've focused on
 
 These integrations will typically entail third party services connecting to Shuffle with inbound Webhooks as triggers in a workflow.
 
-## Single Signon
-Shuffle added Single Signon (SAML v1.0) from Shuffle version 0.9.16 & OpenID in Shuffle version 1.0.0. This allows you to log into Shuffle from other identity platforms, entirely controlled by you. SSO is available for **onprem AND cloud**. It works by setting an Entrypoint (IdP) and X509 Certificate, both used to validate who the requester is. This can be added in [your admin panel](/admin). 
+## OpenID & SAML/SSO - Single Signon
+Shuffle added Single Signon (SAML) from version 0.9.16 & OpenID since 1.0.0. This allows you to log into Shuffle from other sources, entirely controlled by your external environment. SSO is available for **onprem**, even without the Enterprise version of Shuffle cloud. It works by setting an Entrypoint (IdP) and X509 Certificate, both used to validate the requests. This can be added under /admin, and **only works for your PRIMARY organization**.
 
-### Testing SSO
-Shuffle has a "Test SSO" button on the admin page for an organization. If you are logged in, then click the Test account, this button will log you into a valid account from the SSO provider. 
-
-### Org Swapping behavior
-If an Organization requires SSO, it will FORCE you through the SSO login unless your session already has been through SSO for that organization. This may feel counter-intuitive at first, but is a required system as each organization is controlled for SSO individually, and there is no limit to how many organizations a user can have.
+PS: We suggest setting up SSO for a sub-organization first to see if it works, avoiding the potential problem of locking yourself out. We are currently building a system to make it possible to use SSO in an optional way (version 1.4.0~) 
 
 ### Using ANY SSO platform 
 **ONPREM ONLY:** You will have to change the SSO_REDIRECT_URL variable in the .env file to match your front end server link i.e `SSO_REDIRECT_URL=http://<URL>:<PORT>` 
@@ -80,9 +77,7 @@ After adding them, click "Save", saving the configuration. After saving, log out
 
 • Next page will be the SP information, this is where you should provide the Single Sign On URL, and SP Entity ID.
 
-	- ACS URL : 
- 		- For Cloud : https://shuffler.io/api/v1/login_sso
-		- For On-prem: https://<your-ip>:3443/api/v1/login_sso	
+	- ACS URL : https://10.67.0.70:3443/api/v1/login_sso
 	- Entity ID : shuffle-saml
 	- Name ID: Basic Information > Primary Email
  ![image](https://github.com/yogeshgurjar127/Shuffle-docs/assets/118437260/7958a55b-c932-4b5c-8910-dfb42703b695)
@@ -185,12 +180,13 @@ Finally go back to shuffle and use SSO button to login.
 To use OpenID with Azure AD, Shuffle supports OpenID connect with the use of Client IDs and Client secrets. To set up OpenID Connect with Azure, we use "ID_token" authentication. This entails a few normal steps regarding app creation in Azure App Registration.
 
 1. Set up an app in Azure AD with ID tokens enabled
-Go to [app registrations and create a new app](https://portal.azure.com/#blade/Microsoft_AAD_RegisteredApps/ApplicationsListBlade). Make it use "Web" for redirect URI's and direct it to your Shuffle instance at /api/v1/login_openid. From here, make sure to go to "authentication" and enable "ID Tokens"
+Go to [app registrations and create a new app](https://portal.azure.com/#blade/Microsoft_AAD_RegisteredApps/ApplicationsListBlade). Make it use "Web" for redirect URI's and direct it to your Shuffle instance at /api/v1/openid_connect. From here, make sure to go to "authentication" and enable "ID Tokens"
 ![image](https://user-images.githubusercontent.com/5719530/169712651-24f481bc-7d90-4b09-b25f-cd1ec6c52c20.png)
 
 2. Get the Client ID, Client Secret and your Tenant
 Start by generating a client secret. Keep it safe, as we'll use it later. 
-![image](https://user-images.githubusercontent.com/5719530/169712756-a07ae08f-75a6-4174-8c8a-26700fd48654.png)
+
+https://user-images.githubusercontent.com/5719530/169712756-a07ae08f-75a6-4174-8c8a-26700fd48654.png)
 
 The client secret and tenant ID can be found in the "Overview" tab:
 ![image](https://user-images.githubusercontent.com/5719530/169712793-7173a2c5-3450-4a79-8f95-9363b940c293.png)
@@ -202,12 +198,32 @@ The client secret and tenant ID can be found in the "Overview" tab:
 The URL is as such: `https://login.microsoftonline.com/TENANT_ID/oauth2/v2.0/authorize`. The Token URL is not strictly required for ID Token auth.
 ![image](https://user-images.githubusercontent.com/5719530/169712857-fe49855e-da3a-4dca-9fde-59bdc60eaa4d.png)
 	
-5. Done! Click save and log out. Try your new login based on your Azure AD configuration. 
+5. In the "Token Configuration" tab on the left, click "Add Optional Claim." Select the token type as "ID" and choose "email" as the claim, then click "Add."
+
+![Image](https://github.com/user-attachments/assets/1810f16a-567b-4260-8f4d-07095c3bbcdf)
+
+
+6. Done! Click save and log out. Try your new login based on your Azure AD configuration. 
 	
-PS: When the user is signed in, they have the access rights of a "user" in the designated organization, and will have a username according to the ID decided in O365. This can be changed by admins.
+PS: When a user signs in, they are granted the access rights of a "user" within the designated organization. The username will be derived from the email address listed in the Azure users list. Therefore, when creating or adding a new user in Azure, ensure that the email field in their profile is populated. If this email field is empty, the user will not be able to log in to the organization.
 	
 ### Other Platforms
 As long as you can create an identity and acquire an Entrypoint (IdP) and X509, paste them into the Shuffle fields, and it should work with any SAML/SSO provider.
+
+### Testing SSO
+
+Testing Single Sign-On (SSO) ensures that your SSO setup is functioning correctly. When you click the "Test SSO" button, you will be redirected to your SSO authentication page. After authentication, you will be redirected to `https://shuffler.io/workflows` if you are using the cloud version, or `https://domain/workflows` if you are using the on-premises version. There are two test cases to verify the SSO feature:
+
+1. **User Change During Authentication**: If you log into your Shuffle account with username "A" and authenticate with username "B", your username will change to "B". If user "B" does not exist in the organization, they will be added. The video below demonstrates logging into Shuffle with "lalitdeore12@gmail.com" and authenticating with Azure username "lalitdeoretest@lalitdeore12gmail.onmicrosoft.com" (which has the email "lalit@shuffler.io"). After authentication, the user changes from "lalitdeore12@gmail.com" to "lalit@shuffler.io".
+
+https://github.com/user-attachments/assets/3b56162d-928b-434c-81c9-b02533fc3b3c
+
+2. **User Remains the Same During Authentication**: If you log into Shuffle with username "A" and authenticate with the same username "A", your user will not change. The video below shows logging into Shuffle with "lalitdeore12@gmail.com" and authenticating with the same user in Azure. After authentication, the user remains unchanged.
+
+https://github.com/user-attachments/assets/876bb8b3-e1ec-4f2c-a524-f9495b1263c3
+
+**Note**: Ensure that the "email" field is included in the SSO response from your SSO provider. If this field is empty, you may encounter errors. The email from your SSO provider will be assigned as the username in Shuffle.
+
 
 ## KMS
 Shuffle by default allows you to store authentication tokens within Shuffle itself, which are encrypted in the database. Since February 2024, we additionally support the use of external KMS systems to handle authentication, which is based on [Native Actions](https://shuffler.io/docs/extensions#native-actions) and [Schemaless](https://github.com/frikky/schemaless). Native Actions run in the background to perform the "Get KMS key" action, and the run of the app is NOT stored. 
@@ -817,24 +833,8 @@ For searching records from the ServicePilot app we need to write SQL query to se
 **Finally, Click the excecution button and you should now start seeing data sent from ServicePilot into Shuffle which can be used inside workflow for further actions.**
 	
 	
-### ELK/Elastic
-Intergrating Elastic with Shuffle will first require you to set up a webhook in Elastic. Below are the steps you will need to follow to ensure your alerts are forwaded into Shuffle immediately.
-
-1. Create a new workflow in Shuffle, bottom left on your screen head to the triggers tab and drag in the webhook into your workflow. Click on it and ensure that the webhook is started. Copy the provided webhook URI and head over to Elastic.
-   
- ![image](https://github.com/user-attachments/assets/e708d1fd-8222-4c47-ac29-7a2d5f62024e)
-
- ![image](https://github.com/user-attachments/assets/98799857-7640-4cf7-aec4-31224a186320)
-
-3. Follow Elastic's documentation on setting up the webhook [here](https://www.elastic.co/guide/en/kibana/current/webhook-action-type.html).
-   - When setting up the webhook in Elastic you will have to provide a url to send the info to. Provide the Shuffle webhook URI you copied in step 1 above
-   - You do not need to provide authentication in Elastic while setting up, but just incase you do, remember to do the same in your webhook in Shuffle
-
-4. To finish setting up your connector in Elastic you will be required to provide the body of the webhook connector, we will need to provide a JSON body for the connector. Copy and paste the below in the connector body
-    ```{"raw": {{context.alerts}}}```
-
-5. Go ahead and test your connector and then check your workflow executions in Shuffle if you have an incoming execution.
-
+### ELK
+TBD: Kibana forwarding & ElastAlert
 	
 ### Cortex 
 TBD: Responder executions
